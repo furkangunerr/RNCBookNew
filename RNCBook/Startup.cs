@@ -8,6 +8,8 @@ using Microsoft.Extensions.Hosting;
 using RNCBook.DataAccess.Data;
 using RNCBook.DataAccess.Repository;
 using RNCBook.DataAccess.Repository.IRepository;
+using RNCBook.Utility;
+using Microsoft.AspNetCore.Identity.UI.Services;
 
 namespace RNCBook
 {
@@ -26,8 +28,9 @@ namespace RNCBook
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(
                     Configuration.GetConnectionString("DefaultConnection")));
-            services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
+            services.AddIdentity<IdentityUser, IdentityRole>().AddDefaultTokenProviders()
                 .AddEntityFrameworkStores<ApplicationDbContext>();
+            services.AddSingleton<IEmailSender, EmailSender>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.AddControllersWithViews().AddRazorRuntimeCompilation();
             services.AddRazorPages();

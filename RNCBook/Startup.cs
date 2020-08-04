@@ -34,6 +34,21 @@ namespace RNCBook
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.AddControllersWithViews().AddRazorRuntimeCompilation();
             services.AddRazorPages();
+            services.ConfigureApplicationCookie(options =>
+            {
+                options.LoginPath = $"/Identity/Account/Login";
+                options.LogoutPath = $"/Identity/Account/Logout";
+                options.AccessDeniedPath = $"/Identity/Account/AccessDenied";
+            });
+            services.AddAuthentication().AddFacebook(options =>
+            {
+                options.AppId = "3655650431115113";
+                options.AppSecret = "cd6ce9e0a1aa05a7797a010e3d1677b8";
+            });
+            services.AddAuthentication().AddGoogle(options => {
+                options.ClientId = "1086795806223-p0hu30og45unkt3777i6u6b9n0csau2k.apps.googleusercontent.com";
+                options.ClientSecret = "KuYNhwv9Q3wJx6kn6YP5YVh4";
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

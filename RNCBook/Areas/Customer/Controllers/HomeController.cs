@@ -1,10 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using RNCBook.DataAccess.Repository.IRepository;
 using RNCBook.Models;
 using RNCBook.Models.ViewModels;
+using RNCBook.Utility;
 
 namespace RNCBook.Areas.Customer.Controllers
 {
@@ -23,6 +28,17 @@ namespace RNCBook.Areas.Customer.Controllers
         public IActionResult Index()
         {
             IEnumerable<Product> productList = _unitOfWork.Product.GetAll(includeProperties: "Category,CoverType");
+            var claimsIdentity = (ClaimsIdentity)User.Identity;
+            var claim = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier);
+            if (claim != null)
+            {
+                var count = _unitOfWork.ShoppingCart
+                   .GetAll(x => x.ApplicationUserId == claim.Value)
+                   .ToList().Count();
+
+                HttpContext.Session.SetInt32(SD.ssShoppingCart, count);
+            }
+
             return View(productList);
         }
 
@@ -35,6 +51,57 @@ namespace RNCBook.Areas.Customer.Controllers
                 ProductId = productFromDb.Id
             };
             return View(cartObj);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize]
+        public IActionResult Details(ShoppingCart CartObject)
+        {
+            CartObject.Id = 0;
+            if (ModelState.IsValid)
+            {
+                //add to cart
+                var claimsIdentity = (ClaimsIdentity)User.Identity;
+                var claim = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier);
+                CartObject.ApplicationUserId = claim.Value;
+
+                ShoppingCart cartFromDb = _unitOfWork.ShoppingCart.GetFirstOrDefault(
+                    x => x.ApplicationUserId == CartObject.ApplicationUserId && x.ProductId == CartObject.ProductId,
+                    includeProperties: "Product"
+                    );
+                if (cartFromDb == null)
+                {
+                    //no record exist in db for that product for that user.
+                    _unitOfWork.ShoppingCart.Add(CartObject);
+                }
+                else
+                {
+                    cartFromDb.Count += CartObject.Count;
+                    //_unitOfWork.ShoppingCart.Update(cartFromDb);
+                }
+                _unitOfWork.Save();
+
+                var count = _unitOfWork.ShoppingCart
+                    .GetAll(x => x.ApplicationUserId == CartObject.ApplicationUserId)
+                    .ToList().Count();
+                
+                //HttpContext.Session.SetObject(SD.ssShoppingCart, CartObject);
+                HttpContext.Session.SetInt32(SD.ssShoppingCart, count);
+               
+                return RedirectToAction(nameof(Index));
+            }
+            else
+            {
+                var productFromDb = _unitOfWork.Product.GetFirstOrDefault(x => x.Id == CartObject.ProductId, includeProperties: "Category,CoverType");
+                ShoppingCart cartObj = new ShoppingCart()
+                {
+                    Product = productFromDb,
+                    ProductId = productFromDb.Id
+                };
+                return View(cartObj);
+            }
+           
         }
 
         public IActionResult Privacy()

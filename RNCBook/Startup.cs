@@ -10,6 +10,7 @@ using RNCBook.DataAccess.Repository;
 using RNCBook.DataAccess.Repository.IRepository;
 using RNCBook.Utility;
 using Microsoft.AspNetCore.Identity.UI.Services;
+using System;
 
 namespace RNCBook
 {
@@ -50,6 +51,11 @@ namespace RNCBook
                 options.ClientId = "1086795806223-p0hu30og45unkt3777i6u6b9n0csau2k.apps.googleusercontent.com";
                 options.ClientSecret = "KuYNhwv9Q3wJx6kn6YP5YVh4";
             });
+            services.AddSession(options => {
+                options.IdleTimeout = TimeSpan.FromSeconds(30);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -70,7 +76,7 @@ namespace RNCBook
             app.UseStaticFiles();
 
             app.UseRouting();
-
+            app.UseSession();
             app.UseAuthentication();
             app.UseAuthorization();
 

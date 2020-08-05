@@ -26,6 +26,17 @@ namespace RNCBook.Areas.Customer.Controllers
             return View(productList);
         }
 
+        public IActionResult Details(int id)
+        {
+            var productFromDb = _unitOfWork.Product.GetFirstOrDefault(x => x.Id == id, includeProperties: "Category,CoverType");
+            ShoppingCart cartObj = new ShoppingCart()
+            {
+                Product = productFromDb,
+                ProductId = productFromDb.Id
+            };
+            return View(cartObj);
+        }
+
         public IActionResult Privacy()
         {
             return View();

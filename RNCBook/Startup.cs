@@ -11,6 +11,7 @@ using RNCBook.DataAccess.Repository.IRepository;
 using RNCBook.Utility;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using System;
+using Stripe;
 
 namespace RNCBook
 {
@@ -33,6 +34,7 @@ namespace RNCBook
                 .AddEntityFrameworkStores<ApplicationDbContext>();
             services.AddSingleton<IEmailSender, EmailSender>();
             services.Configure<EmailOptions>(Configuration);
+            services.Configure<StripeSettings>(Configuration.GetSection("Stripe"));
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.AddControllersWithViews().AddRazorRuntimeCompilation();
             services.AddRazorPages();
@@ -76,6 +78,7 @@ namespace RNCBook
             app.UseStaticFiles();
 
             app.UseRouting();
+            StripeConfiguration.ApiKey = Configuration.GetSection("Stripe")["SecretKey"];
             app.UseSession();
             app.UseAuthentication();
             app.UseAuthorization();

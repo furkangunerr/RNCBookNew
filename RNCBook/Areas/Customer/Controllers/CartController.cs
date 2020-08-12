@@ -14,6 +14,7 @@ using RNCBook.DataAccess.Repository.IRepository;
 using RNCBook.Models;
 using RNCBook.Models.ViewModels;
 using RNCBook.Utility;
+using Stripe;
 
 namespace RNCBook.Areas.Customer.Controllers
 {
@@ -24,6 +25,7 @@ namespace RNCBook.Areas.Customer.Controllers
         private readonly IEmailSender _emailSender;
         private readonly UserManager<IdentityUser> _userManager;
 
+        [BindProperty]
         public ShoppingCartVM ShoppingCartVM { get; set; }
 
 
@@ -167,7 +169,7 @@ namespace RNCBook.Areas.Customer.Controllers
         [HttpPost]
         [ActionName("Summary")]
         [ValidateAntiForgeryToken]
-        public IActionResult SummaryPost()
+        public IActionResult SummaryPost(string stripeToken)
         {
             var claimsIdentity = (ClaimsIdentity)User.Identity;
             var claim = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier);
@@ -185,6 +187,7 @@ namespace RNCBook.Areas.Customer.Controllers
             List<OrderDetails> orderDetailsList = new List<OrderDetails>();
             foreach(var item in ShoppingCartVM.ListCart)
             {
+                item.Price = SD.GetPriceBaseOnQuantity(item.Count, item.Product.Price, item.Product.Price50, item.Product.Price100);
                 OrderDetails orderDetails = new OrderDetails()
                 {
                     ProductId = item.ProductId,
@@ -194,12 +197,56 @@ namespace RNCBook.Areas.Customer.Controllers
                 };
                 ShoppingCartVM.OrderHeader.OrderTotal += orderDetails.Count * orderDetails.Price;
                 _unitOfWork.OrderDetails.Add(orderDetails);
-                _unitOfWork.Save();
+                
             }
 
             _unitOfWork.ShoppingCart.RemoveRange(ShoppingCartVM.ListCart);
+            _unitOfWork.Save();
             HttpContext.Session.SetInt32(SD.ssShoppingCart, 0);
+
+            if (stripeToken == null) 
+            {
+                ShoppingCartVM.OrderHeader.PaymentDueDate = DateTime.Now.AddDays(30);
+                ShoppingCartVM.OrderHeader.PaymentStatus = SD.PaymentStatusDelayedPayment;
+                ShoppingCartVM.OrderHeader.OrderStatus = SD.StatusApproved;
+            }
+            
+            else
+            {
+                //process the payment
+                var options = new ChargeCreateOptions
+                {
+                    Amount = Convert.ToInt32(ShoppingCartVM.OrderHeader.OrderTotal * 100),
+                    Currency = "usd",
+                    Description = "Order ID : " + ShoppingCartVM.OrderHeader.Id,
+                    Source = stripeToken
+                };
+                var service = new ChargeService();
+                Charge charge = service.Create(options);
+
+                if (charge.BalanceTransactionId == null)
+                {
+                    ShoppingCartVM.OrderHeader.PaymentStatus = SD.PaymentStatusRejected;
+                }
+                else
+                {
+                    ShoppingCartVM.OrderHeader.TransactionId = charge.BalanceTransactionId;
+                }
+                if (charge.Status.ToLower() == "succeeded")
+                {
+                    ShoppingCartVM.OrderHeader.PaymentStatus = SD.PaymentStatusApproved;
+                    ShoppingCartVM.OrderHeader.OrderStatus = SD.StatusApproved;
+                    ShoppingCartVM.OrderHeader.PaymentDate = DateTime.Now;
+                }
+
+            }
+            _unitOfWork.Save();
             return RedirectToAction("OrderConfirmation", "Cart", new { id = ShoppingCartVM.OrderHeader.Id });
+        }
+
+        public IActionResult OrderConfirmation(int id)
+        {
+            return View(id);
         }
     }
 }

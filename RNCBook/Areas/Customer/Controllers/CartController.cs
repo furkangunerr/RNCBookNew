@@ -10,11 +10,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 using RNCBook.DataAccess.Repository.IRepository;
 using RNCBook.Models;
 using RNCBook.Models.ViewModels;
 using RNCBook.Utility;
 using Stripe;
+using Twilio;
+using Twilio.Rest.Api.V2010.Account;
 
 namespace RNCBook.Areas.Customer.Controllers
 {
@@ -23,6 +26,8 @@ namespace RNCBook.Areas.Customer.Controllers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IEmailSender _emailSender;
+
+        private TwilioSettings _twilioOptions { get; set; }
         private readonly UserManager<IdentityUser> _userManager;
 
         [BindProperty]
@@ -31,11 +36,13 @@ namespace RNCBook.Areas.Customer.Controllers
 
         public CartController(IUnitOfWork unitOfWork,
             IEmailSender emailSender,
-            UserManager<IdentityUser> userManager)
+            UserManager<IdentityUser> userManager,
+            IOptions<TwilioSettings> twilioOptions)
         {
             _unitOfWork = unitOfWork;
             _emailSender = emailSender;
             _userManager = userManager;
+            _twilioOptions = twilioOptions.Value;
         }
         public IActionResult Index()
         {
@@ -246,6 +253,21 @@ namespace RNCBook.Areas.Customer.Controllers
 
         public IActionResult OrderConfirmation(int id)
         {
+            OrderHeader orderHeader = _unitOfWork.OrderHeader.GetFirstOrDefault(x => x.Id == id);
+            TwilioClient.Init(_twilioOptions.AccountSid, _twilioOptions.AuthToken);
+            try
+            {
+                var message = MessageResource.Create(
+                    body: "Order Placed on RNCBook,Your Order ID : " + id +" Order Price : "+ orderHeader.OrderTotal +" TL",
+                    from: new Twilio.Types.PhoneNumber(_twilioOptions.PhoneNumber),
+                    to: new Twilio.Types.PhoneNumber(orderHeader.PhoneNumber)
+                    ); 
+            }
+            catch (Exception ex)
+            {
+                //
+            }
+
             return View(id);
         }
     }

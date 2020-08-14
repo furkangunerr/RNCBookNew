@@ -5,7 +5,7 @@ using System.Text;
 
 namespace RNCBook.DataAccess.Repository.IRepository
 {
-    public interface ICategoryRepository : IRepository<Category>
+    public interface ICategoryRepository : IRepositoryAsync<Category>
     {
         void Update(Category category);
     }
